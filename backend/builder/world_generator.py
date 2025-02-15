@@ -47,6 +47,7 @@ def assign_entities_to_map(map_data):
         dict: Updated map data with assigned entities.
     """
     entities = load_entities()
+    entity_locations = []
     logger.info(f"Loaded {len(entities.get('entities', []))} entities")
     logger.info(entities)
     rows, cols = len(map_data["map"]), len(map_data["map"][0])
@@ -69,10 +70,13 @@ def assign_entities_to_map(map_data):
         if nation_index in country_tiles and country_tiles[nation_index]:
             tile = random.choice(country_tiles[nation_index])  # Select a random tile
             assigned_entities[tile[0]][tile[1]] = entity["path"]  # Assign entity path to tile
-            country_tiles[nation_index].remove(tile)  # Remove assigned tile from available slots
+            country_tiles[nation_index].remove(tile)
+            entity['location'] = tile
+            entity_locations.append(entity) # Remove assigned tile from available slots
     
     # Store the assigned entity matrix in map data
     map_data["entities"] = assigned_entities
+    map_data["entity_locations"] = entity_locations  # Store entity locations for game logic
     return map_data
 
 @router.get("/generate-entity-map")

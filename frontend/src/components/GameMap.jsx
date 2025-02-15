@@ -1,8 +1,9 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Canvas, useLoader, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { Card, CardContent, Typography } from "@mui/material";
+import CameraControls from "./CameraControls";
 import InfluencerCarousel from "./InfluencerCarousel";
 
 // Preload textures once and cache them
@@ -52,46 +53,34 @@ function TileDetails({ selectedTile }) {
   );
 }
 
-function CameraControls() {
-  const { camera } = useThree();
-  
-  function resetCamera() {
-    camera.position.set(0, 0, 20);
-    camera.lookAt(0, 0, 0);
-  }
-
-  useEffect(() => {
-    const handleDoubleClick = () => resetCamera();
-    window.addEventListener("dblclick", handleDoubleClick);
-    return () => window.removeEventListener("dblclick", handleDoubleClick);
-  }, []);
-
-  return <OrbitControls enablePan enableZoom enableRotate />;
-}
-
 function GameMap() {
   const [mapData, setMapData] = useState(null);
   const [selectedTile, setSelectedTile] = useState(null);
+  const [zoomTarget, setZoomTarget] = useState(null);
   const textures = useMemo(preloadTextures, []);
 
+  const resetZoom = () => {
+    setZoomTarget([0, 0]);
+  };
+
   useEffect(() => {
-    fetch("http://localhost:8000/generate-map")
+    fetch("http://localhost:8000/builder/game/start")
       .then(response => response.json())
       .then(data => setMapData(data));
   }, []);
 
   if (!mapData) return <div>Loading map...</div>;
 
-  const { map, elevation, terrain, buildings, countries, entity_names, entities } = mapData;
+  const { map, elevation, terrain, buildings, countries, entity_names, entities, entity_locations } = mapData;
 
   return (
     <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
       <TileDetails selectedTile={selectedTile} />
-      <InfluencerCarousel entityData={{ entities }} />
+      <InfluencerCarousel entityData={{ entity_locations }} setZoomTarget={setZoomTarget} />
       <Canvas camera={{ position: [0, 0, 20], fov: 50 }} style={{ width: "100%", height: "100%" }} shadows>
         <ambientLight intensity={0.8} />
         <directionalLight position={[10, 10, 10]} intensity={1} castShadow />
-        <CameraControls />
+        <CameraControls zoomTarget={zoomTarget} resetZoom={resetZoom} />
         {map.map((row, x) =>
           row.map((_, y) => {
             const height = elevation[x][y] * 5;
