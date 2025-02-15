@@ -1,65 +1,67 @@
-from fastapi import APIRouter
+import os
 import numpy as np
 import random
+import json
+from fastapi import APIRouter, HTTPException
 from scipy.spatial import Voronoi
 from fastapi.responses import JSONResponse
 from noise import pnoise2
 from loguru import logger
+from builder.schemas import MapConfig
+
 
 # Define API router
 router = APIRouter()
 
-MAP_WIDTH = 20
-MAP_HEIGHT = 20
-COUNTRIES = 6
-SCALE = 10.0  # Scale for Perlin noise
-OCTAVES = 6  # Increased for more detail
-PERSISTENCE = 0.6  # Adjusted for smoother transitions
-LACUNARITY = 2.5  # Increased for more terrain variety
-SEA_LEVEL = -0.05  # Define sea level threshold
-MOUNTAIN_THRESHOLD = 0.6  # Define mountain threshold
-BUILDING_DENSITY = 0.02  # Probability of a building on a land tile
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config", "map_config.json")
+
+# Load configuration from JSON file
+def load_config():
+    with open(CONFIG_PATH, "r") as file:
+        return json.load(file)
+
+config = load_config()
 
 logger.info("Initializing map generation parameters")
 
 def generate_voronoi_map():
+    """
+    Generates a procedural map using Voronoi segmentation and Perlin noise.
+    Assigns countries, terrain, and elevation data.
+    """
     try:
         logger.info("Generating country centers")
-        country_centers = np.array([[random.randint(0, MAP_WIDTH), random.randint(0, MAP_HEIGHT)] for _ in range(COUNTRIES)])
+        country_centers = np.array([[random.randint(0, config["MAP_WIDTH"]), random.randint(0, config["MAP_HEIGHT"]) ] for _ in range(config["COUNTRIES"])])
         vor = Voronoi(country_centers)
         
-        country_map = np.zeros((MAP_WIDTH, MAP_HEIGHT), dtype=int)
-        elevation_map = np.zeros((MAP_WIDTH, MAP_HEIGHT), dtype=float)
-        terrain_map = np.zeros((MAP_WIDTH, MAP_HEIGHT), dtype=object)
-        country_names = [f"Country {i+1}" for i in range(COUNTRIES)]
-        country_assignment = np.full((MAP_WIDTH, MAP_HEIGHT), "", dtype=object)
+        country_map = np.zeros((config["MAP_WIDTH"], config["MAP_HEIGHT"]), dtype=int)
+        elevation_map = np.zeros((config["MAP_WIDTH"], config["MAP_HEIGHT"]), dtype=float)
+        terrain_map = np.zeros((config["MAP_WIDTH"], config["MAP_HEIGHT"]), dtype=object)
+        country_names = [f"Country {i+1}" for i in range(config["COUNTRIES"])]
+        country_assignment = np.full((config["MAP_WIDTH"], config["MAP_HEIGHT"]), "", dtype=object)
         buildings = []
         grid_coordinates = []
 
         logger.info("Generating terrain, assigning countries, and adding additional map data")
-        for i in range(MAP_WIDTH):
-            for j in range(MAP_HEIGHT):
+        for i in range(config["MAP_WIDTH"]):
+            for j in range(config["MAP_HEIGHT"]):
                 grid_coordinates.append((i, j))
-                # Generate elevation using Perlin noise
-                elevation = pnoise2(i / SCALE, j / SCALE, octaves=OCTAVES, persistence=PERSISTENCE, lacunarity=LACUNARITY)
+                elevation = pnoise2(i / config["SCALE"], j / config["SCALE"], octaves=config["OCTAVES"], persistence=config["PERSISTENCE"], lacunarity=config["LACUNARITY"])
                 elevation_map[i, j] = elevation
                 
-                # Assign country based on Voronoi distance
                 point = np.array([i, j])
                 distances = [np.linalg.norm(point - center) for center in country_centers]
                 country_index = np.argmin(distances)
                 country_map[i, j] = country_index
                 country_assignment[i, j] = country_names[country_index]
                 
-                # Determine terrain type based on elevation
-                if elevation < SEA_LEVEL:
-                    terrain_map[i, j] = "water" 
-                elif elevation > MOUNTAIN_THRESHOLD:
+                if elevation < config["SEA_LEVEL"]:
+                    terrain_map[i, j] = "water"
+                elif elevation > config["MOUNTAIN_THRESHOLD"]:
                     terrain_map[i, j] = "mountain"
                 else:
                     terrain_map[i, j] = "land"
-                    # Randomly place buildings on land tiles
-                    if random.random() < BUILDING_DENSITY:
+                    if random.random() < config["BUILDING_DENSITY"]:
                         buildings.append({"x": i, "y": j, "type": "building"})
         
         logger.info("Map generation complete")
@@ -78,5 +80,25 @@ def generate_voronoi_map():
 
 @router.get("/generate-map")
 def get_map():
+    """
+    API route to generate and return a procedural map.
+    """
     logger.info("Processing API request for /generate-map")
-    return JSONResponse(content=generate_voronoi_map())
+    map_data = generate_voronoi_map()
+    return JSONResponse(content=map_data)
+
+@router.post("/update-config")
+def update_config(new_config: MapConfig):
+    """
+    API route to update the map configuration.
+    """
+    try:
+        with open(CONFIG_PATH, "w") as file:
+            json.dump(new_config, file, indent=4)
+        global config
+        config = load_config()
+        logger.info("Map configuration updated successfully")
+        return {"message": "Configuration updated successfully"}
+    except Exception as e:
+        logger.error(f"Failed to update configuration: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update configuration")

@@ -1,7 +1,12 @@
+import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from builder.map_generator import router
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.openapi.docs import get_redoc_html
+from builder.map_generator import router as map_router
+from builder.world_generator import router as world_router
+from builder.game_generator import router as game_router
 
 app = FastAPI()
 
@@ -14,8 +19,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include all route modules
-app.include_router(router)
+
+# Register builder microservices
+app.include_router(map_router, prefix="/builder/map")
+app.include_router(world_router, prefix="/builder/world")
+app.include_router(game_router, prefix="/builder/game")
+
 
 # Serve API Docs
 @app.get("/openapi.json", include_in_schema=False)
@@ -24,15 +33,12 @@ def get_open_api_endpoint():
 
 @app.get("/docs", include_in_schema=False)
 def overridden_swagger():
-    from fastapi.openapi.docs import get_swagger_ui_html
     return get_swagger_ui_html(openapi_url="/openapi.json", title="Game Map API Docs")
 
 @app.get("/redoc", include_in_schema=False)
 def overridden_redoc():
-    from fastapi.openapi.docs import get_redoc_html
     return get_redoc_html(openapi_url="/openapi.json", title="Game Map API Docs")
 
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)

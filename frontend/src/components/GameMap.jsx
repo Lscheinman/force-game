@@ -3,6 +3,7 @@ import { Canvas, useLoader, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { Card, CardContent, Typography } from "@mui/material";
+import InfluencerCarousel from "./InfluencerCarousel";
 
 // Preload textures once and cache them
 const preloadTextures = () => {
@@ -18,8 +19,8 @@ const preloadTextures = () => {
 
 function Tile({ position, height, texture, onClick }) {
   return (
-    <mesh position={[position[0], position[1], height / 2]} onClick={onClick}>
-      <boxGeometry args={[1, 1, Math.max(height, 0.1)]} />
+    <mesh position={[position[0], position[1], height / 2]} onClick={onClick} castShadow receiveShadow>
+      <boxGeometry args={[1, 1, Math.max(height, 0.75)]} />
       <meshStandardMaterial attach="material" map={texture} />
     </mesh>
   );
@@ -27,7 +28,7 @@ function Tile({ position, height, texture, onClick }) {
 
 function Building({ position }) {
   return (
-    <mesh position={[position[0], position[1], 0.75]}>
+    <mesh position={[position[0], position[1], 0.75]} castShadow receiveShadow>
       <boxGeometry args={[0.5, 0.5, 1.5]} />
       <meshStandardMaterial attach="material" color="gray" />
     </mesh>
@@ -45,6 +46,7 @@ function TileDetails({ selectedTile }) {
         <Typography variant="body1">Elevation: {selectedTile.elevation.toFixed(2)}</Typography>
         <Typography variant="body1">Terrain: {selectedTile.terrain}</Typography>
         <Typography variant="body1">Country: {selectedTile.country}</Typography>
+        {selectedTile.influencer && <Typography variant="body1">Influencer: {selectedTile.influencer}</Typography>}
       </CardContent>
     </Card>
   );
@@ -80,14 +82,15 @@ function GameMap() {
 
   if (!mapData) return <div>Loading map...</div>;
 
-  const { map, elevation, terrain, buildings, countries } = mapData;
+  const { map, elevation, terrain, buildings, countries, entity_names, entities } = mapData;
 
   return (
     <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
       <TileDetails selectedTile={selectedTile} />
-      <Canvas camera={{ position: [0, 0, 20], fov: 50 }} style={{ width: "100%", height: "100%" }}>
+      <InfluencerCarousel entityData={{ entities }} />
+      <Canvas camera={{ position: [0, 0, 20], fov: 50 }} style={{ width: "100%", height: "100%" }} shadows>
         <ambientLight intensity={0.8} />
-        <directionalLight position={[10, 10, 10]} intensity={1} />
+        <directionalLight position={[10, 10, 10]} intensity={1} castShadow />
         <CameraControls />
         {map.map((row, x) =>
           row.map((_, y) => {
@@ -95,6 +98,7 @@ function GameMap() {
             const countryIndex = countries[x][y].split(" ")[1]; // Extract country number
             const terrainKey = `${terrain[x][y]}_${countryIndex}`;
             const texture = textures[terrainKey] || textures[terrain[x][y]] || textures.land;
+            const influencer = entity_names && entity_names[x][y] ? entity_names[x][y] : null;
             return (
               <Tile
                 key={`${x}-${y}`}
@@ -106,7 +110,8 @@ function GameMap() {
                   y, 
                   elevation: elevation[x][y], 
                   terrain: terrain[x][y], 
-                  country: countries[x][y] 
+                  country: countries[x][y],
+                  influencer
                 })}
               />
             );

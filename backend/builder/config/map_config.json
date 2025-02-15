@@ -1,0 +1,13 @@
+{
+    "MAP_WIDTH": 20,
+    "MAP_HEIGHT": 20,
+    "COUNTRIES": 6,
+    "SCALE": 10.0,
+    "OCTAVES": 6,
+    "PERSISTENCE": 0.6,
+    "LACUNARITY": 2.5,
+    "SEA_LEVEL": -0.05,
+    "MOUNTAIN_THRESHOLD": 0.6,
+    "BUILDING_DENSITY": 0.02
+  }
+  

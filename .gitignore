@@ -3,3 +3,4 @@
 /.vscode
 *.pyc
 /backend/venv
+backend/database/sample.json
